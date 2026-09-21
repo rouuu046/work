@@ -24,7 +24,7 @@
     .result-item { margin: 8px 0; font-size: 15px; }
     .highlight { color: #d9534f; font-size: 20px; font-weight: bold; }
     .note-title { margin-top: 15px; font-weight: bold; color: #333; }
-    .note-box { background: #fff; padding: 12px; border: 1px dashed #007bff; border-radius: 6px; margin-top: 5px; font-size: 14px; line-height: 1.6; word-break: break-all; }
+    .note-box { background: #fff; padding: 12px; border: 1px dashed #007bff; border-radius: 6px; margin-top: 5px; font-size: 14px; line-height: 1.6; word-break: break-all; white-space: pre-wrap; }
     .btn-copy { background-color: #28a745; margin-top: 10px; }
     .btn-copy:hover { background-color: #218838; }
   </style>
@@ -72,7 +72,7 @@
   <div id="partTimePre" class="tab-content">
     <div class="form-group">
       <label for="ptPreHireDate">1. 計時到職日期：</label>
-      <input type="date" id="ptPreHireDate" value="2025-07-27">
+      <input type="date" id="ptPreHireDate" value="2025-07-28">
     </div>
 
     <div class="form-group">
@@ -211,7 +211,7 @@
     document.getElementById('resultBox').style.display = 'block';
   }
 
-  // 2. 計時補前段計算邏輯
+  // 2. 計時補前段計算邏輯（輸出指定格式）
   function calculatePartTimePreLeave() {
     let hireDateInput = document.getElementById('ptPreHireDate').value;
     let actualHours = parseFloat(document.getElementById('ptPreActualHours').value);
@@ -223,7 +223,7 @@
 
     let hireDate = new Date(hireDateInput);
     let hireYear = hireDate.getFullYear();
-    let cutoffDate = new Date(hireYear, 11, 31);
+    let cutoffDate = new Date(hireYear, 11, 30); // 採計至 12/30
 
     let diffTime = cutoffDate.getTime() - hireDate.getTime();
     let workedDays = Math.ceil(diffTime / (1000 * 3600 * 24)) + 1;
@@ -234,8 +234,8 @@
     let totalWorkDays = getWorkDays(hireDate, cutoffDate);
     let fullHours = totalWorkDays * 8; 
 
-    let fullTimePreDays = (workedDays / totalDaysInYear) * 7;
-    let fullTimePreHours = fullTimePreDays * 8;
+    // 前段比例時數（56小時）
+    let fullTimePreHours = (workedDays / totalDaysInYear) * 56;
 
     let exactHours = (actualHours / fullHours) * fullTimePreHours;
     let finalLeaveHours = floorToHalfHour(exactHours);
@@ -249,7 +249,10 @@
     `;
 
     document.getElementById('resLeaveDisplay').innerText = `${finalLeaveHours} 小時`;
-    document.getElementById('noteText').innerText = `${formatDate(hireDate)}~${formatDate(cutoffDate)}計時前段比例特休\n前段全職特休：${workedDays}天 / ${totalDaysInYear}天 * 7天 = ${fullTimePreDays.toFixed(3)}天 (${fullTimePreHours.toFixed(3)}小時)\n計時比例計算：實際出勤 (${actualHours}小時) / 應出勤 (${fullHours}小時) * ${fullTimePreHours.toFixed(3)}小時 = ${exactHours.toFixed(3)}小時 = ${finalLeaveHours}小時`;
+    
+    // 指定輸出格式：包含「一年特休」標頭
+    document.getElementById('noteText').innerText = `一年特休\n${formatDate(hireDate)}~${formatDate(cutoffDate)}計時前段比例特休\n計時比例計算：實際出勤 (${actualHours}小時) / 應出勤 (${fullHours}小時) * ${fullTimePreHours.toFixed(3)}小時 = ${exactHours.toFixed(3)}小時 = ${finalLeaveHours}小時`;
+    
     document.getElementById('resultBox').style.display = 'block';
   }
 
