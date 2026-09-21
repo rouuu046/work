@@ -62,7 +62,7 @@
 
     <div class="form-group">
       <label for="actualHours">3. 兼職實際出勤時數 (分子)：</label>
-      <input type="number" id="actualHours" placeholder="例如：617">
+      <input type="number" id="actualHours" placeholder="例如：439">
     </div>
 
     <button onclick="calculatePartTimeLeave()">自動精算分母並生成備註</button>
@@ -72,7 +72,7 @@
   <div id="partTimePre" class="tab-content">
     <div class="form-group">
       <label for="ptPreHireDate">1. 計時到職日期：</label>
-      <input type="date" id="ptPreHireDate" value="2025-07-28">
+      <input type="date" id="ptPreHireDate" value="2025-07-27">
     </div>
 
     <div class="form-group">
@@ -87,7 +87,7 @@
   <div id="fullTime" class="tab-content">
     <div class="form-group">
       <label for="ftHireDate">1. 正職到職日期：</label>
-      <input type="date" id="ftHireDate" value="2025-07-29">
+      <input type="date" id="ftHireDate" value="2025-07-27">
     </div>
 
     <button onclick="calculateFullTimeLeave()">計算滿1年應補前段比例特休</button>
@@ -106,16 +106,16 @@
 </div>
 
 <script>
-  // 跨年份國定假日與補休日清單
+  // 完整的國定假日與紀念日補假清單（含新制 9/29 教師節補假、10/24 光復節補假、12/25 行憲紀念日）
   const holidayData = {
     2025: [
       "2025-01-01", "2025-01-27", "2025-01-28", "2025-01-29", "2025-01-30", "2025-01-31",
       "2025-02-28",
       "2025-04-03", "2025-04-04",
       "2025-05-01", "2025-05-30",
-      "2025-09-29",
-      "2025-10-06", "2025-10-10", "2025-10-24",
-      "2025-12-25"
+      "2025-09-29", // 教師節補假
+      "2025-10-06", "2025-10-10", "2025-10-24", // 光復節補假
+      "2025-12-25"  // 行憲紀念日
     ],
     2026: [
       "2026-01-01",
@@ -129,18 +129,23 @@
     ]
   };
 
-  // 0.5 小時向下取整函數（無條件捨去至 0.5 單位）
   function floorToHalfHour(hours) {
     return Math.floor(hours * 2) / 2;
   }
 
-  // 判斷非工作日（六日與假日）
+  function formatDate(d) {
+    let y = d.getFullYear();
+    let m = String(d.getMonth() + 1).padStart(2, '0');
+    let day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   function isNonWorkingDay(date) {
     let dayOfWeek = date.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) return true;
 
     let year = date.getFullYear();
-    let dateString = date.toISOString().split('T')[0];
+    let dateString = formatDate(date);
 
     if (holidayData[year] && holidayData[year].includes(dateString)) {
       return true;
@@ -148,10 +153,9 @@
     return false;
   }
 
-  // 精算指定區間的全職應上班天數
   function getWorkDays(startDate, endDate) {
     let count = 0;
-    let cur = new Date(startDate);
+    let cur = new Date(startDate.getTime());
     while (cur <= endDate) {
       if (!isNonWorkingDay(cur)) {
         count++;
@@ -170,7 +174,6 @@
     document.getElementById('resultBox').style.display = 'none';
   }
 
-  // 1. 計時兼職計算邏輯
   function calculatePartTimeLeave() {
     let hireDateInput = document.getElementById('hireDate').value;
     let periodYears = parseFloat(document.getElementById('period').value);
@@ -181,8 +184,9 @@
       return;
     }
 
-    let startDate = new Date(hireDateInput);
-    let endDate = new Date(startDate);
+    let parts = hireDateInput.split('-');
+    let startDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    let endDate = new Date(startDate.getTime());
     endDate.setMonth(endDate.getMonth() + (periodYears * 12));
 
     let totalWorkDays = getWorkDays(startDate, endDate);
@@ -199,8 +203,6 @@
     let exactResult = (actualHours / fullHours) * legalHours;
     let finalLeaveHours = floorToHalfHour(exactResult);
 
-    let formatDate = (d) => d.toISOString().split('T')[0];
-
     document.getElementById('resultDetails').innerHTML = `
       <div class="result-item">📅 計算區間：${formatDate(startDate)} ~ ${formatDate(endDate)}</div>
       <div class="result-item">🏢 精算全職應上班天數：<b>${totalWorkDays}</b> 天</div>
@@ -211,7 +213,6 @@
     document.getElementById('resultBox').style.display = 'block';
   }
 
-  // 2. 計時補前段計算邏輯（精確計算至當年底 12/31）
   function calculatePartTimePreLeave() {
     let hireDateInput = document.getElementById('ptPreHireDate').value;
     let actualHours = parseFloat(document.getElementById('ptPreActualHours').value);
@@ -221,13 +222,11 @@
       return;
     }
 
-    // 處理日期格式 (避免跨時區偏離)
     let parts = hireDateInput.split('-');
     let hireDate = new Date(parts[0], parts[1] - 1, parts[2]);
     let hireYear = hireDate.getFullYear();
-    let cutoffDate = new Date(hireYear, 11, 31); // 採計至當年度 12 月 31 日
+    let cutoffDate = new Date(hireYear, 11, 31);
 
-    // 計算在職日數（含頭尾）
     let diffTime = cutoffDate.getTime() - hireDate.getTime();
     let workedDays = Math.round(diffTime / (1000 * 3600 * 24)) + 1;
 
@@ -237,18 +236,10 @@
     let totalWorkDays = getWorkDays(hireDate, cutoffDate);
     let fullHours = totalWorkDays * 8; 
 
-    // 前段比例時數（以 56 小時為基礎）
     let fullTimePreHours = (workedDays / totalDaysInYear) * 56;
 
     let exactHours = (actualHours / fullHours) * fullTimePreHours;
     let finalLeaveHours = floorToHalfHour(exactHours);
-
-    let formatDate = (d) => {
-      let y = d.getFullYear();
-      let m = String(d.getMonth() + 1).padStart(2, '0');
-      let day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
 
     document.getElementById('resultDetails').innerHTML = `
       <div class="result-item">📅 前段採計區間：${formatDate(hireDate)} ~ ${formatDate(cutoffDate)}</div>
@@ -258,13 +249,11 @@
 
     document.getElementById('resLeaveDisplay').innerText = `${finalLeaveHours} 小時`;
     
-    // 指定輸出格式
     document.getElementById('noteText').innerText = `一年特休\n${formatDate(hireDate)}~${formatDate(cutoffDate)}計時前段比例特休\n計時比例計算：實際出勤 (${actualHours}小時) / 應出勤 (${fullHours}小時) * ${fullTimePreHours.toFixed(3)}小時 = ${exactHours.toFixed(3)}小時 = ${finalLeaveHours}小時`;
     
     document.getElementById('resultBox').style.display = 'block';
   }
 
-  // 3. 正職補前段比例計算邏輯（精確計算至當年底 12/31）
   function calculateFullTimeLeave() {
     let hireDateInput = document.getElementById('ftHireDate').value;
 
@@ -276,7 +265,7 @@
     let parts = hireDateInput.split('-');
     let hireDate = new Date(parts[0], parts[1] - 1, parts[2]);
     let hireYear = hireDate.getFullYear();
-    let cutoffDate = new Date(hireYear, 11, 31); // 採計至當年度 12 月 31 日
+    let cutoffDate = new Date(hireYear, 11, 31);
 
     let diffTime = cutoffDate.getTime() - hireDate.getTime();
     let workedDays = Math.round(diffTime / (1000 * 3600 * 24)) + 1;
@@ -287,13 +276,6 @@
     let exactLeaveDays = (workedDays / totalDaysInYear) * 7;
     let exactHours = exactLeaveDays * 8;
     let finalLeaveHours = floorToHalfHour(exactHours);
-
-    let formatDate = (d) => {
-      let y = d.getFullYear();
-      let m = String(d.getMonth() + 1).padStart(2, '0');
-      let day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
 
     document.getElementById('resultDetails').innerHTML = `
       <div class="result-item">📅 前段採計區間：${formatDate(hireDate)} ~ ${formatDate(cutoffDate)}</div>
