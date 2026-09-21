@@ -211,7 +211,7 @@
     document.getElementById('resultBox').style.display = 'block';
   }
 
-  // 2. 計時補前段計算邏輯（輸出指定格式）
+  // 2. 計時補前段計算邏輯（精確計算至當年底 12/31）
   function calculatePartTimePreLeave() {
     let hireDateInput = document.getElementById('ptPreHireDate').value;
     let actualHours = parseFloat(document.getElementById('ptPreActualHours').value);
@@ -221,12 +221,15 @@
       return;
     }
 
-    let hireDate = new Date(hireDateInput);
+    // 處理日期格式 (避免跨時區偏離)
+    let parts = hireDateInput.split('-');
+    let hireDate = new Date(parts[0], parts[1] - 1, parts[2]);
     let hireYear = hireDate.getFullYear();
-    let cutoffDate = new Date(hireYear, 11, 30); // 採計至 12/30
+    let cutoffDate = new Date(hireYear, 11, 31); // 採計至當年度 12 月 31 日
 
+    // 計算在職日數（含頭尾）
     let diffTime = cutoffDate.getTime() - hireDate.getTime();
-    let workedDays = Math.ceil(diffTime / (1000 * 3600 * 24)) + 1;
+    let workedDays = Math.round(diffTime / (1000 * 3600 * 24)) + 1;
 
     let isLeapYear = (hireYear % 4 === 0 && hireYear % 100 !== 0) || (hireYear % 400 === 0);
     let totalDaysInYear = isLeapYear ? 366 : 365;
@@ -234,13 +237,18 @@
     let totalWorkDays = getWorkDays(hireDate, cutoffDate);
     let fullHours = totalWorkDays * 8; 
 
-    // 前段比例時數（56小時）
+    // 前段比例時數（以 56 小時為基礎）
     let fullTimePreHours = (workedDays / totalDaysInYear) * 56;
 
     let exactHours = (actualHours / fullHours) * fullTimePreHours;
     let finalLeaveHours = floorToHalfHour(exactHours);
 
-    let formatDate = (d) => d.toISOString().split('T')[0];
+    let formatDate = (d) => {
+      let y = d.getFullYear();
+      let m = String(d.getMonth() + 1).padStart(2, '0');
+      let day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
 
     document.getElementById('resultDetails').innerHTML = `
       <div class="result-item">📅 前段採計區間：${formatDate(hireDate)} ~ ${formatDate(cutoffDate)}</div>
@@ -250,13 +258,13 @@
 
     document.getElementById('resLeaveDisplay').innerText = `${finalLeaveHours} 小時`;
     
-    // 指定輸出格式：包含「一年特休」標頭
+    // 指定輸出格式
     document.getElementById('noteText').innerText = `一年特休\n${formatDate(hireDate)}~${formatDate(cutoffDate)}計時前段比例特休\n計時比例計算：實際出勤 (${actualHours}小時) / 應出勤 (${fullHours}小時) * ${fullTimePreHours.toFixed(3)}小時 = ${exactHours.toFixed(3)}小時 = ${finalLeaveHours}小時`;
     
     document.getElementById('resultBox').style.display = 'block';
   }
 
-  // 3. 正職補前段比例計算邏輯
+  // 3. 正職補前段比例計算邏輯（精確計算至當年底 12/31）
   function calculateFullTimeLeave() {
     let hireDateInput = document.getElementById('ftHireDate').value;
 
@@ -265,12 +273,13 @@
       return;
     }
 
-    let hireDate = new Date(hireDateInput);
+    let parts = hireDateInput.split('-');
+    let hireDate = new Date(parts[0], parts[1] - 1, parts[2]);
     let hireYear = hireDate.getFullYear();
-    let cutoffDate = new Date(hireYear, 11, 31);
+    let cutoffDate = new Date(hireYear, 11, 31); // 採計至當年度 12 月 31 日
 
     let diffTime = cutoffDate.getTime() - hireDate.getTime();
-    let workedDays = Math.ceil(diffTime / (1000 * 3600 * 24)) + 1;
+    let workedDays = Math.round(diffTime / (1000 * 3600 * 24)) + 1;
 
     let isLeapYear = (hireYear % 4 === 0 && hireYear % 100 !== 0) || (hireYear % 400 === 0);
     let totalDaysInYear = isLeapYear ? 366 : 365;
@@ -279,7 +288,12 @@
     let exactHours = exactLeaveDays * 8;
     let finalLeaveHours = floorToHalfHour(exactHours);
 
-    let formatDate = (d) => d.toISOString().split('T')[0];
+    let formatDate = (d) => {
+      let y = d.getFullYear();
+      let m = String(d.getMonth() + 1).padStart(2, '0');
+      let day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
 
     document.getElementById('resultDetails').innerHTML = `
       <div class="result-item">📅 前段採計區間：${formatDate(hireDate)} ~ ${formatDate(cutoffDate)}</div>
