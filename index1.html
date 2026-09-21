@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>特休計算機</title>
+  <style>
+    body { font-family: "Microsoft JhengHei", Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; padding: 30px; }
+    .card { background: white; padding: 25px 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 520px; }
+    h2 { margin-top: 0; color: #333; text-align: center; }
+    
+    .tab-container { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+    .tab-button { flex: 1; padding: 10px; border: none; background: #eee; font-size: 14px; font-weight: bold; cursor: pointer; color: #666; transition: 0.3s; }
+    .tab-button.active { background: #007bff; color: white; border-radius: 6px 6px 0 0; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+    button { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    button:hover { background-color: #0056b3; }
+    .result-box { margin-top: 20px; padding: 15px; background-color: #e9ecef; border-radius: 6px; display: none; }
+    .result-item { margin: 8px 0; font-size: 15px; }
+    .highlight { color: #d9534f; font-size: 20px; font-weight: bold; }
+    .note-title { margin-top: 15px; font-weight: bold; color: #333; }
+    .note-box { background: #fff; padding: 12px; border: 1px dashed #007bff; border-radius: 6px; margin-top: 5px; font-size: 14px; line-height: 1.6; word-break: break-all; }
+    .btn-copy { background-color: #28a745; margin-top: 10px; }
+    .btn-copy:hover { background-color: #218838; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>特休計算機</h2>
+
+  <!-- 頁籤切換 -->
+  <div class="tab-container">
+    <button class="tab-button active" onclick="switchTab('partTime', this)">計時</button>
+    <button class="tab-button" onclick="switchTab('partTimePre', this)">計時補前段</button>
+    <button class="tab-button" onclick="switchTab('fullTime', this)">正職補前段</button>
+  </div>
+
+  <!-- 1. 計時兼職表單 -->
+  <div id="partTime" class="tab-content active">
+    <div class="form-group">
+      <label for="hireDate">1. 到職日期：</label>
+      <input type="date" id="hireDate" value="2025-07-27">
+    </div>
+
+    <div class="form-group">
+      <label for="period">2. 年資階段：</label>
+      <select id="period">
+        <option value="0.5">滿 0.5 年（法定 3 天 / 24 小時）</option>
+        <option value="1">滿 1 年（法定 7 天 / 56 小時）</option>
+        <option value="2">滿 2 年（法定 10 天 / 80 小時）</option>
+        <option value="3">滿 3 年（法定 14 天 / 112 小時）</option>
+        <option value="4">滿 4 年（法定 14 天 / 112 小時）</option>
+        <option value="5">滿 5 年（法定 15 天 / 120 小時）</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="actualHours">3. 兼職實際出勤時數 (分子)：</label>
+      <input type="number" id="actualHours" placeholder="例如：617">
+    </div>
+
+    <button onclick="calculatePartTimeLeave()">自動精算分母並生成備註</button>
+  </div>
+
+  <!-- 2. 計時補前段表單 -->
+  <div id="partTimePre" class="tab-content">
+    <div class="form-group">
+      <label for="ptPreHireDate">1. 計時到職日期：</label>
+      <input type="date" id="ptPreHireDate" value="2025-07-27">
+    </div>
+
+    <div class="form-group">
+      <label for="ptPreActualHours">2. 前段實際出勤時數 (分子)：</label>
+      <input type="number" id="ptPreActualHours" placeholder="例如：450">
+    </div>
+
+    <button onclick="calculatePartTimePreLeave()">計算計時補前段比例特休</button>
+  </div>
+
+  <!-- 3. 正職補前段比例表單 -->
+  <div id="fullTime" class="tab-content">
+    <div class="form-group">
+      <label for="ftHireDate">1. 正職到職日期：</label>
+      <input type="date" id="ftHireDate" value="2025-07-29">
+    </div>
+
+    <button onclick="calculateFullTimeLeave()">計算滿1年應補前段比例特休</button>
+  </div>
+
+  <!-- 結果顯示區 -->
+  <div class="result-box" id="resultBox">
+    <div id="resultDetails"></div>
+    <hr>
+    <div class="result-item">🎉 應補前段特休：<br><span class="highlight" id="resLeaveDisplay"></span></div>
+    
+    <div class="note-title">📝 自動生成備註：</div>
+    <div class="note-box" id="noteText"></div>
+    <button class="btn-copy" onclick="copyNote()">複製備註文字</button>
+  </div>
+</div>
+
+<script>
+  // 跨年份國定假日與補休日清單 (僅放平日放假日，已剔除補班日)
+  const holidayData = {
+    // 114 年 (2025 年) 平日放假日
+    2025: [
+      "2025-01-01", "2025-01-27", "2025-01-28", "2025-01-29", "2025-01-30", "2025-01-31",
+      "2025-02-28",
+      "2025-04-03", "2025-04-04",
+      "2025-05-01", "2025-05-30",
+      "2025-09-29",
+      "2025-10-06", "2025-10-10", "2025-10-24",
+      "2025-12-25"
+    ],
+    // 115 年 (2026 年) 平日放假日
+    2026: [
+      "2026-01-01",
+      "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-27",
+      "2026-04-03", "2026-04-06",
+      "2026-05-01",
+      "2026-06-19",
+      "2026-09-25", "2026-09-28",
+      "2026-10-09", "2026-10-26",
+      "2026-12-25"
+    ]
+  };
+
+  // 判斷是否為非工作日（每週六日，或是資料庫中的平日國定假日）
+  function isNonWorkingDay(date) {
+    let dayOfWeek = date.getDay();
+    // 0 為週日，6 為週六
+    if (dayOfWeek === 0 || dayOfWeek === 6) return true;
+
+    let year = date.getFullYear();
+    let dateString = date.toISOString().split('T')[0];
+
+    if (holidayData[year] && holidayData[year].includes(dateString)) {
+      return true;
+    }
+    return false;
+  }
+
+  // 精算指定區間的全職應上班天數
+  function getWorkDays(startDate, endDate) {
+    let count = 0;
+    let cur = new Date(startDate);
+    while (cur <= endDate) {
+      if (!isNonWorkingDay(cur)) {
+        count++;
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  }
+
+  function switchTab(tabId, element) {
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    element.classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+    document.getElementById('resultBox').style.display = 'none';
+  }
+
+  // 1. 計時兼職計算邏輯
+  function calculatePartTimeLeave() {
+    let hireDateInput = document.getElementById('hireDate').value;
+    let periodYears = parseFloat(document.getElementById('period').value);
+    let actualHours = parseFloat(document.getElementById('actualHours').value);
+
+    if (!hireDateInput || isNaN(actualHours)) {
+      alert('請完整填寫到職日期與實際出勤時數！');
+      return;
+    }
+
+    let startDate = new Date(hireDateInput);
+    let endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + (periodYears * 12));
+
+    let totalWorkDays = getWorkDays(startDate, endDate);
+    let fullHours = totalWorkDays * 8;
+
+    let legalDays = 0;
+    if (periodYears === 0.5) legalDays = 3;
+    else if (periodYears === 1) legalDays = 7;
+    else if (periodYears === 2) legalDays = 10;
+    else if (periodYears === 3 || periodYears === 4) legalDays = 14;
+    else if (periodYears >= 5) legalDays = 15;
+
+    let legalHours = legalDays * 8; 
+    let exactResult = (actualHours / fullHours) * legalHours;
+    let finalLeaveHours = exactResult.toFixed(1);
+
+    let daysPart = Math.floor(finalLeaveHours / 8);
+    let hoursPart = (finalLeaveHours % 8).toFixed(1);
+    let formatDate = (d) => d.toISOString().split('T')[0];
+
+    document.getElementById('resultDetails').innerHTML = `
+      <div class="result-item">📅 計算區間：${formatDate(startDate)} ~ ${formatDate(endDate)}</div>
+      <div class="result-item">🏢 精算全職應上班天數：<b>${totalWorkDays}</b> 天</div>
+      <div class="result-item">⏰ 精算全職分母時數：<b>${fullHours}</b> 小時</div>
+    `;
+    document.getElementById('resLeaveDisplay').innerText = `${finalLeaveHours} 小時 (${daysPart} 天 ${hoursPart} 小時)`;
+    document.getElementById('noteText').innerText = `特休計算說明：依勞動部規定按兼職比例計算：實際出勤 (${actualHours} 小時) / 應出勤時數 (${fullHours} 小時) * 法定特休 (${legalHours} 小時) = ${exactResult.toFixed(3)} 小時 ≈ ${finalLeaveHours} 小時 (約 ${daysPart} 天 ${hoursPart} 小時)`;
+    document.getElementById('resultBox').style.display = 'block';
+  }
+
+  // 2. 計時補前段計算邏輯
+  function calculatePartTimePreLeave() {
+    let hireDateInput = document.getElementById('ptPreHireDate').value;
+    let actualHours = parseFloat(document.getElementById('ptPreActualHours').value);
+
+    if (!hireDateInput || isNaN(actualHours)) {
+      alert('請完整填寫到職日期與實際出勤時數！');
+      return;
+    }
+
+    let hireDate = new Date(hireDateInput);
+    let hireYear = hireDate.getFullYear();
+    let cutoffDate = new Date(hireYear, 11, 31); // 當年 12/31
+
+    // 前段日曆總天數 (含到職當天)
+    let diffTime = cutoffDate.getTime() - hireDate.getTime();
+    let workedDays = Math.ceil(diffTime / (1000 * 3600 * 24)) + 1;
+
+    // 判斷全年日曆天數 (平年365，閏年366)
+    let isLeapYear = (hireYear % 4 === 0 && hireYear % 100 !== 0) || (hireYear % 400 === 0);
+    let totalDaysInYear = isLeapYear ? 366 : 365;
+
+    // 計算前段工作天數與分母時數
+    let totalWorkDays = getWorkDays(hireDate, cutoffDate);
+    let fullHours = totalWorkDays * 8; 
+
+    // 計算前段比例全職特休
+    let fullTimePreDays = (workedDays / totalDaysInYear) * 7;
+    let fullTimePreHours = fullTimePreDays * 8;
+
+    // 計算計時人員補前段比例特休
+    let exactHours = (actualHours / fullHours) * fullTimePreHours;
+    let roundHours = exactHours.toFixed(1);
+    let ceilHours = Math.ceil(exactHours);
+
+    let formatDate = (d) => d.toISOString().split('T')[0];
+
+    document.getElementById('resultDetails').innerHTML = `
+      <div class="result-item">📅 前段採計區間：${formatDate(hireDate)} ~ ${formatDate(cutoffDate)}</div>
+      <div class="result-item">🗓️ 前段在職天數：<b>${workedDays}</b> / 全年 ${totalDaysInYear} 天</div>
+      <div class="result-item">🏢 前段全職應上班天數：<b>${totalWorkDays}</b> 天 (分母時數：<b>${fullHours}</b> 小時)</div>
+    `;
+
+    document.getElementById('resLeaveDisplay').innerText = `${ceilHours} 小時 (${roundHours}小時進位)`;
+    document.getElementById('noteText').innerText = `${formatDate(hireDate)}~${formatDate(cutoffDate)}計時前段比例特休\n前段全職特休：${workedDays}天/${totalDaysInYear}天 * 7天 = ${fullTimePreDays.toFixed(3)} 天 (${fullTimePreHours.toFixed(2)} 小時)\n計時比例計算：實際出勤 (${actualHours} 小時) / 應出勤 (${fullHours} 小時) * ${fullTimePreHours.toFixed(2)} 小時 = ${exactHours.toFixed(3)} 小時 = ${roundHours} 小時 = ${ceilHours} 小時`;
+    document.getElementById('resultBox').style.display = 'block';
+  }
+
+  // 3. 正職補前段比例計算邏輯
+  function calculateFullTimeLeave() {
+    let hireDateInput = document.getElementById('ftHireDate').value;
+
+    if (!hireDateInput) {
+      alert('請填寫正職到職日期！');
+      return;
+    }
+
+    let hireDate = new Date(hireDateInput);
+    let hireYear = hireDate.getFullYear();
+    let cutoffDate = new Date(hireYear, 11, 31);
+
+    let diffTime = cutoffDate.getTime() - hireDate.getTime();
+    let workedDays = Math.ceil(diffTime / (1000 * 3600 * 24)) + 1;
+
+    let isLeapYear = (hireYear % 4 === 0 && hireYear % 100 !== 0) || (hireYear % 400 === 0);
+    let totalDaysInYear = isLeapYear ? 366 : 365;
+
+    let exactLeaveDays = (workedDays / totalDaysInYear) * 7;
+    let exactHours = exactLeaveDays * 8;
+    let roundHours = exactHours.toFixed(1);
+    let ceilHours = Math.ceil(exactHours);
+
+    let formatDate = (d) => d.toISOString().split('T')[0];
+
+    document.getElementById('resultDetails').innerHTML = `
+      <div class="result-item">📅 前段採計區間：${formatDate(hireDate)} ~ ${formatDate(cutoffDate)}</div>
+      <div class="result-item">🗓️ 前段在職天數：<b>${workedDays}</b> / 全年 ${totalDaysInYear} 天</div>
+    `;
+    
+    document.getElementById('resLeaveDisplay').innerText = `${ceilHours} 小時 (${roundHours}小時進位)`;
+    document.getElementById('noteText').innerText = `${formatDate(hireDate)}~${formatDate(cutoffDate)}一年比例特休\n${workedDays}天 / ${totalDaysInYear}天 * 7天 = ${exactLeaveDays.toFixed(3)} 天 = ${roundHours} 小時 = ${ceilHours} 小時`;
+    document.getElementById('resultBox').style.display = 'block';
+  }
+
+  function copyNote() {
+    let text = document.getElementById('noteText').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      alert('已成功複製備註文字！');
+    });
+  }
+</script>
+
+</body>
+</html>
